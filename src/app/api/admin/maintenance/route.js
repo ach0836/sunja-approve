@@ -3,10 +3,9 @@ import path from "node:path"
 import { NextResponse } from "next/server"
 
 import {
-  backupXataSnapshot,
+  backupSupabaseSnapshot,
   synchronizeRequestStatuses,
-  migrateAdminTokens,
-} from "@/lib/server/xataMaintenance"
+} from "@/lib/server/supabaseMaintenance"
 
 const ADMIN_PASSWORD = process.env.PASSWORD ?? process.env.ADMIN_PASSWORD
 
@@ -29,7 +28,7 @@ export async function POST(req) {
     }
 
     if (action === "backup") {
-      const { filePath, snapshot } = await backupXataSnapshot()
+      const { filePath, snapshot } = await backupSupabaseSnapshot()
       return NextResponse.json({
         success: true,
         action,
@@ -40,13 +39,6 @@ export async function POST(req) {
 
     if (action === "sync-status") {
       const result = await synchronizeRequestStatuses()
-      return NextResponse.json({ success: true, action, result })
-    }
-
-    if (action === "migrate-fcm") {
-      const result = await migrateAdminTokens({
-        removeLegacy: options.removeLegacy ?? true,
-      })
       return NextResponse.json({ success: true, action, result })
     }
 

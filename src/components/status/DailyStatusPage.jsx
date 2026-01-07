@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { stringify } from "qs"
 
 import { STUDY_PERIOD_OPTIONS } from "@/lib/constants"
 
@@ -30,11 +29,10 @@ async function fetchDailyRequests(status) {
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
   const todayEnd = new Date(new Date().setHours(23, 59, 59, 999)).toISOString()
 
+  // Supabase는 직접 URL 쿼리 파라미터로 필터링
+  // created_at이 todayStart와 todayEnd 사이의 요청만 필터링
   const response = await fetch(
-    "/api/requests?" +
-      stringify({
-        $all: [{ "xata.createdAt": { $ge: todayStart } }, { "xata.createdAt": { $le: todayEnd } }],
-      }),
+    `/api/requests?status=${status}`,
   )
 
   if (!response.ok) {
@@ -42,7 +40,12 @@ async function fetchDailyRequests(status) {
   }
 
   const result = await response.json()
-  const filtered = result.requests.filter((request) => request.status === status)
+  const filtered = result.requests.filter((request) => {
+    const createdAt = new Date(request.created_at)
+    const startDate = new Date(todayStart)
+    const endDate = new Date(todayEnd)
+    return createdAt >= startDate && createdAt <= endDate
+  })
 
   return filtered.map((request) => ({
     ...request,

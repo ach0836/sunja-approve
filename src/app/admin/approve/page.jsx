@@ -11,12 +11,10 @@ import {
 } from "react"
 import { useRouter } from "next/navigation"
 import { useMediaQuery } from "react-responsive"
-import { stringify } from "qs"
 import { useToast } from "@/components/toast/ToastProvider"
 import { REQUEST_STATUS } from "@/lib/constants"
 import { updateRequestStatusAction, deleteRequestAction } from "./actions"
 import {
-  buildDailyQueryString,
   findEarlierPendingRequests,
   isPremiumMember,
   sortRequestsForReview,
@@ -195,12 +193,12 @@ function DesktopTable({
                         <td className="w-32">
                           <button
                             type="button"
-                            className={`btn w-full ${row.isApproved ? "btn-soft btn-error" : "btn-soft btn-success"
+                            className={`btn w-full ${row.is_approved ? "btn-soft btn-error" : "btn-soft btn-success"
                               }`}
                             disabled={busy}
-                            onClick={() => (row.isApproved ? onReject(row) : onApprove(row))}
+                            onClick={() => (row.is_approved ? onReject(row) : onApprove(row))}
                           >
-                            {row.isApproved ? "거부" : "승인"}
+                            {row.is_approved ? "거부" : "승인"}
                           </button>
                         </td>
                         <td className="w-24">
@@ -344,12 +342,12 @@ function MobileCards({
             </div>
             <button
               type="button"
-              className={`btn w-full ${item.isApproved ? "btn-soft btn-error" : "btn-soft btn-success"
+              className={`btn w-full ${item.is_approved ? "btn-soft btn-error" : "btn-soft btn-success"
                 }`}
               disabled={busy}
-              onClick={() => (item.isApproved ? onReject(item) : onApprove(item))}
+              onClick={() => (item.is_approved ? onReject(item) : onApprove(item))}
             >
-              {item.isApproved ? "거부" : "승인"}
+              {item.is_approved ? "거부" : "승인"}
             </button>
           </div>
         </div>
@@ -420,8 +418,8 @@ export default function ApproveRequestsPage() {
             item.id === action.id
               ? {
                 ...item,
-                isApproved: action.isApproved,
-                status: action.isApproved ? REQUEST_STATUS.APPROVED : REQUEST_STATUS.REJECTED,
+                is_approved: action.is_approved,
+                status: action.is_approved ? REQUEST_STATUS.APPROVED : REQUEST_STATUS.REJECTED,
               }
               : item,
           )
@@ -446,9 +444,20 @@ export default function ApproveRequestsPage() {
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/requests?${stringify(buildDailyQueryString())}`)
+      const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+      const todayEnd = new Date(new Date().setHours(23, 59, 59, 999)).toISOString()
+
+      const response = await fetch(`/api/requests`)
       const result = await response.json()
-      const transformed = sortRequestsForReview(result.requests.map(transformRequest))
+      const filtered = result.requests
+        .filter((request) => {
+          const createdAt = new Date(request.created_at)
+          const startDate = new Date(todayStart)
+          const endDate = new Date(todayEnd)
+          return createdAt >= startDate && createdAt <= endDate
+        })
+        .map(transformRequest)
+      const transformed = sortRequestsForReview(filtered)
       setRequests(transformed)
       startTransition(() => {
         applyOptimisticRequest({ type: "set", requests: transformed })
@@ -497,7 +506,7 @@ export default function ApproveRequestsPage() {
     const execute = async () => {
       const previousSnapshot = requests.map((item) => ({ ...item }))
       startTransition(() => {
-        applyOptimisticRequest({ type: "update-status", id: request.id, isApproved })
+        applyOptimisticRequest({ type: "update-status", id: request.id, is_approved: isApproved })
       })
       const pendingId = toast.info(isApproved ? "승인 처리 중..." : "거부 처리 중...", {
         duration: 0,

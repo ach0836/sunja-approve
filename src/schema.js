@@ -10,7 +10,7 @@ const formSchema = z.object({
   applicant: z.array(applicantSchema).min(1, "사용 인원을 선택하세요"),
   reason: z.string().min(1, "사유를 입력하세요"),
   contact: z.string().regex(/^(010-\d{4}-\d{4}|010\d{8})$/, "대표자 전화번호를 입력하세요"),
-  isApproved: z.boolean().nullable().default(null),
+  is_approved: z.boolean().nullable().default(null),
 })
 
 export default formSchema

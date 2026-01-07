@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { runXataOperation } from "@/lib/server/xataClient"
+import { getSupabaseClient } from "@/lib/server/supabaseClient"
 
 export async function POST(req) {
   try {
@@ -11,10 +11,18 @@ export async function POST(req) {
       return NextResponse.json({ error: "토큰이 제공되지 않았습니다." }, { status: 400 })
     }
 
-    const existing = await runXataOperation(
-      (client) => client.db.admin_tokens.filter({ token }).getFirst(),
-      { retries: 2 },
-    )
+    const client = getSupabaseClient()
+
+    const { data: existing, error: fetchError } = await client
+      .from("admin_tokens")
+      .select("*")
+      .eq("token", token)
+      .single()
+
+    if (fetchError && fetchError.code !== "PGRST116") {
+      // PGRST116 is "no rows found" which is expected
+      throw fetchError
+    }
 
     const payload = {
       label: label ?? existing?.label ?? null,
@@ -22,23 +30,30 @@ export async function POST(req) {
     }
 
     if (existing) {
-      const updated = await runXataOperation(
-        (client) => client.db.admin_tokens.update(existing.id, payload),
-        { retries: 2 },
-      )
+      const { data: updated, error: updateError } = await client
+        .from("admin_tokens")
+        .update(payload)
+        .eq("id", existing.id)
+        .select()
+        .single()
+
+      if (updateError) throw updateError
       return NextResponse.json({ success: true, record: updated, created: false })
     }
 
-    const record = await runXataOperation(
-      (client) =>
-        client.db.admin_tokens.create({
+    const { data: record, error: createError } = await client
+      .from("admin_tokens")
+      .insert([
+        {
           token,
           label: payload.label,
           lastValidatedAt: payload.lastValidatedAt,
-        }),
-      { retries: 2 },
-    )
+        },
+      ])
+      .select()
+      .single()
 
+    if (createError) throw createError
     return NextResponse.json({ success: true, record, created: true })
   } catch (error) {
     console.error("토큰 저장 오류:", error)

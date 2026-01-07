@@ -1,18 +1,27 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { stringify } from "qs"
 
-import { buildDailyQueryString, mapRequestsByPeriod, transformRequest } from "@/lib/admin/requests"
+import { mapRequestsByPeriod, transformRequest } from "@/lib/admin/requests"
 import { STUDY_PERIOD_OPTIONS } from "@/lib/constants"
 
 async function fetchAdminRequests(status) {
-  const response = await fetch(`/api/requests?${stringify(buildDailyQueryString())}`)
+  const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+  const todayEnd = new Date(new Date().setHours(23, 59, 59, 999)).toISOString()
+
+  const response = await fetch(`/api/requests?status=${status}`)
   if (!response.ok) {
     throw new Error("데이터를 불러오는데 실패했습니다.")
   }
   const result = await response.json()
-  return result.requests.filter((request) => request.status === status).map(transformRequest)
+  return result.requests
+    .filter((request) => {
+      const createdAt = new Date(request.created_at)
+      const startDate = new Date(todayStart)
+      const endDate = new Date(todayEnd)
+      return createdAt >= startDate && createdAt <= endDate
+    })
+    .map(transformRequest)
 }
 
 const columns = [

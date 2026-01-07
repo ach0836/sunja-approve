@@ -1,10 +1,14 @@
 import { checkTokenValidity, sendNotification } from "./fcm"
-import { runXataOperation } from "./xataClient"
+import { getSupabaseClient } from "./supabaseClient"
 
 export async function broadcastAdminRequestNotification(record) {
-  const adminTokenRecords = await runXataOperation((client) => client.db.admin_tokens.getAll(), {
-    retries: 2,
-  })
+  const client = getSupabaseClient()
+  const { data: adminTokenRecords, error } = await client.from("admin_tokens").select("*")
+
+  if (error) {
+    console.error("Failed to fetch admin tokens:", error)
+    return { skipped: true, reason: "database-error", error: error.message }
+  }
 
   const tokenMap = new Map()
   for (const adminToken of adminTokenRecords) {
@@ -47,7 +51,7 @@ export async function broadcastAdminRequestNotification(record) {
   if (invalidTokens.length) {
     await Promise.all(
       invalidTokens.map(({ record }) =>
-        runXataOperation((client) => client.db.admin_tokens.delete(record.id), { retries: 2 }),
+        client.from("admin_tokens").delete().eq("id", record.id),
       ),
     )
   }
@@ -70,13 +74,15 @@ export async function broadcastAdminRequestNotification(record) {
             notification: baseNotification,
             data: { requestId: record.id },
           })
-          await runXataOperation(
-            (client) =>
-              client.db.admin_tokens.update(recordMeta.id, {
-                lastValidatedAt: new Date().toISOString(),
-              }),
-            { retries: 2 },
-          )
+          const { error: updateError } = await client
+            .from("admin_tokens")
+            .update({
+              lastValidatedAt: new Date().toISOString(),
+            })
+            .eq("id", recordMeta.id)
+
+          if (updateError) throw updateError
+
           return { token, id: recordMeta.id, response }
         } catch (error) {
           error.meta = { token, id: recordMeta.id }
@@ -93,7 +99,7 @@ export async function broadcastAdminRequestNotification(record) {
     const { token, id } = error?.meta ?? {}
     failures.push({ token, error })
     if (error?.errorInfo?.code === "messaging/registration-token-not-registered" && id) {
-      await runXataOperation((client) => client.db.admin_tokens.delete(id), { retries: 2 })
+      await client.from("admin_tokens").delete().eq("id", id)
     }
   }
 

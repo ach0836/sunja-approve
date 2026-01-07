@@ -7,11 +7,10 @@ import {
   flexRender,
   getPaginationRowModel,
 } from "@tanstack/react-table"
-import { stringify } from "qs"
 import { useRouter } from "next/navigation"
 import { useMediaQuery } from "react-responsive"
 import { useToast } from "@/components/toast/ToastProvider"
-import { buildDailyQueryString, transformRequest } from "@/lib/admin/requests"
+import { transformRequest } from "@/lib/admin/requests"
 import AdminTableLayout from "@/components/admin/AdminTableLayout"
 import PaginationControls from "@/components/admin/PaginationControls"
 
@@ -56,8 +55,8 @@ const downloadTemplatePDF = async (rowData) => {
   const fontBytes = await fetch("/malgun.ttf").then((res) => res.arrayBuffer())
   const customFont = await pdfDoc.embedFont(fontBytes)
 
-  // xata.createdAt에서 월, 일을 분리해서 추출
-  const { month, day } = formatDateParts(rowData.xata.createdAt)
+  // created_at에서 월, 일을 분리해서 추출
+  const { month, day } = formatDateParts(rowData.created_at)
 
   // 예시: 월과 일을 각각 다른 좌표에 출력 (좌표는 템플릿에 맞게 조정)
   firstPage.drawText(`${month}`, {
@@ -354,11 +353,11 @@ export default function Homeadmin() {
   const isMobile = useMediaQuery({ query: "(max-width: 768px)" })
   const toast = useToast()
 
-  // API에서 데이터 가져오기: xata.createdAt을 그대로 할당
+  // API에서 데이터 가져오기
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/requests?${stringify(buildDailyQueryString())}`)
+      const response = await fetch(`/api/requests?isApproved=true`)
       const result = await response.json()
       const transformedData = result.requests
         .map(transformRequest)
@@ -366,9 +365,8 @@ export default function Homeadmin() {
           ...request,
           teacher: request.teacher,
         }))
-        // isApproved가 true인 값만 필터링
-        .filter((item) => item.isApproved)
-        .sort((a, b) => new Date(b.xata?.createdAt ?? 0) - new Date(a.xata?.createdAt ?? 0))
+        // created_at을 기준으로 정렬
+        .sort((a, b) => new Date(b.created_at ?? 0) - new Date(a.created_at ?? 0))
 
       setData(transformedData)
     } catch (error) {

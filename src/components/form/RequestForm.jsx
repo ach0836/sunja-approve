@@ -53,7 +53,7 @@ export default function RequestForm({
       reason: "",
       contact: "",
       applicantNum: String(defaultApplicantCount),
-      isApproved: false,
+      is_approved: false,
     },
   })
 
@@ -70,20 +70,14 @@ export default function RequestForm({
 
     handler(message, {
       duration: 3000,
-      onClose: () => {
-        setIsFormDisabled(false)
-        reset({
-          time: "",
-          applicant: buildEmptyApplicants(defaultApplicantCount),
-          reason: "",
-          contact: "",
-          applicantNum: String(defaultApplicantCount),
-          isApproved: false,
-        })
-        setNumApplicants(defaultApplicantCount)
-        setApplicantIds(Array.from({ length: defaultApplicantCount }, generateApplicantId))
-      },
     })
+
+    if (type === "success") {
+      // 제출 성공 시 1.5초 후 페이지 새로고침
+      setTimeout(() => {
+        window.location.href = "/"
+      }, 1500)
+    }
   }
 
   const handleApplicantNumChange = (value) => {
@@ -94,7 +88,7 @@ export default function RequestForm({
 
   const onSubmit = async (data) => {
     setIsFormDisabled(true)
-    const payload = { ...data, isApproved: false, fcm: fcmToken }
+    const payload = { ...data, is_approved: false, fcm: fcmToken }
 
     try {
       const response = await fetch("/api/requests", {
@@ -103,14 +97,18 @@ export default function RequestForm({
         body: JSON.stringify(payload),
       })
 
+      const responseData = await response.json()
+
       if (!response.ok) {
-        throw new Error("Submission failed")
+        console.error("API error response:", responseData)
+        setIsFormDisabled(false)
+        throw new Error(responseData.error || "Submission failed")
       }
 
       showToast("제출되었습니다.", "success")
     } catch (error) {
       console.error("Error submitting data:", error)
-      showToast("제출 실패", "error")
+      showToast(error.message || "제출 실패", "error")
     }
   }
 

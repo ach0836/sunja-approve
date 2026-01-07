@@ -1,12 +1,11 @@
 import { sendNotification } from "./fcm"
-import { runXataOperation } from "./xataClient"
+import { getSupabaseClient } from "./supabaseClient"
 
 export async function sendApprovalNotification(requestId, isApproved) {
-  const record = await runXataOperation((client) => client.db.requests.read(requestId), {
-    retries: 2,
-  })
+  const client = getSupabaseClient()
+  const { data: record, error } = await client.from("requests").select("*").eq("id", requestId).single()
 
-  if (!record) {
+  if (error || !record) {
     return { success: false, error: "record-not-found" }
   }
 
