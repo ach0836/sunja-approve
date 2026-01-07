@@ -24,16 +24,16 @@ export async function broadcastAdminRequestNotification(record) {
   const tokenEntries = Array.from(tokenMap.entries())
 
   const validityResults = await Promise.all(
-    tokenEntries.map(async ([token, recordMeta]) => {
+    tokenEntries.map(async ([token, adminTokenRecord]) => {
       try {
         const { valid } = await checkTokenValidity(token)
-        return { token, record: recordMeta, valid }
+        return { token, adminTokenRecord, valid }
       } catch (error) {
         if (error?.errorInfo?.code === "messaging/registration-token-not-registered") {
-          return { token, record: recordMeta, valid: false }
+          return { token, adminTokenRecord, valid: false }
         }
         console.error(`토큰 검사 중 오류 발생 (${token}):`, error)
-        return { token, record: recordMeta, valid: false, error }
+        return { token, adminTokenRecord, valid: false, error }
       }
     }),
   )
@@ -50,8 +50,8 @@ export async function broadcastAdminRequestNotification(record) {
 
   if (invalidTokens.length) {
     await Promise.all(
-      invalidTokens.map(({ record }) =>
-        client.from("admin_tokens").delete().eq("id", record.id),
+      invalidTokens.map(({ adminTokenRecord }) =>
+        client.from("admin_tokens").delete().eq("id", adminTokenRecord.id),
       ),
     )
   }
@@ -66,26 +66,18 @@ export async function broadcastAdminRequestNotification(record) {
   }
 
   const notificationResults = await Promise.allSettled(
-    validTokens.map(({ token, record: recordMeta }) =>
+    validTokens.map(({ token, adminTokenRecord }) =>
       (async () => {
         try {
           const response = await sendNotification({
             token,
             notification: baseNotification,
-            data: { requestId: record.id },
+            data: { requestId: String(record.id) },
           })
-          const { error: updateError } = await client
-            .from("admin_tokens")
-            .update({
-              lastValidatedAt: new Date().toISOString(),
-            })
-            .eq("id", recordMeta.id)
 
-          if (updateError) throw updateError
-
-          return { token, id: recordMeta.id, response }
+          return { token, id: adminTokenRecord.id, response }
         } catch (error) {
-          error.meta = { token, id: recordMeta.id }
+          error.meta = { token, id: adminTokenRecord.id }
           throw error
         }
       })(),

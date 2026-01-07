@@ -43,21 +43,33 @@ export default function HomePage() {
 
   const handleGetToken = async () => {
     try {
+      console.log("토큰 요청 시작...")
       await requestPermissionIfNeeded()
+      console.log("알림 권한 확인 완료")
+
+      if (!messaging) {
+        throw new Error("Firebase Messaging이 초기화되지 않았습니다.")
+      }
+
       const currentToken = await getToken(messaging, {
         vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY,
       })
 
+      console.log("VAPID Key:", process.env.NEXT_PUBLIC_VAPID_KEY)
+      console.log("Firebase Messaging:", messaging)
+
       if (!currentToken) {
-        console.log("토큰을 가져올 수 없습니다.")
+        console.error("토큰을 가져올 수 없습니다.")
+        alert("토큰을 가져올 수 없습니다. 브라우저 설정을 확인하세요.")
         return
       }
 
-      console.log("FCM 토큰:", currentToken)
+      console.log("FCM 토큰 획득:", currentToken)
       setFcmToken(currentToken)
       await saveAdminToken(currentToken)
     } catch (error) {
       console.error("토큰 등록 중 오류 발생:", error)
+      alert(`토큰 등록 중 오류가 발생했습니다:\n${error.message}`)
     }
   }
 
@@ -70,13 +82,18 @@ export default function HomePage() {
         body: JSON.stringify({ token }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error("요청 저장 실패")
+        console.error("토큰 저장 실패 응답:", data)
+        throw new Error(data?.error || data?.detail || "요청 저장 실패")
       }
 
-      console.log("관리자 토큰이 성공적으로 저장되었습니다.")
+      console.log("관리자 토큰이 성공적으로 저장되었습니다.", data)
+      alert("알림 토큰이 성공적으로 저장되었습니다!")
     } catch (error) {
       console.error("토큰 저장 중 오류 발생:", error)
+      alert(`토큰 저장 중 오류가 발생했습니다:\n${error.message}`)
     } finally {
       setIsSaving(false)
     }
