@@ -1,31 +1,75 @@
 import { NextResponse } from "next/server"
-
 import { getSupabaseClient } from "@/lib/server/supabaseClient"
 
+// 관리자 API 인증 확인
+function verifyAdminAuth(req) {
+  const authHeader = req.headers.get("authorization") || ""
+  const token = authHeader.replace(/^Bearer\s+/i, "")
+  const adminPassword = process.env.ADMIN_PASSWORD || process.env.PASSWORD
+
+  if (!adminPassword || token !== adminPassword) {
+    return false
+  }
+  return true
+}
+
+// 입력값 검증
+function validateToken(token) {
+  if (typeof token !== "string") return false
+  if (token.length < 100 || token.length > 300) return false
+  return /^[a-zA-Z0-9_-]+$/.test(token)
+}
+
 export async function POST(req) {
+  // 관리자 인증 확인
+  if (!verifyAdminAuth(req)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    )
+  }
+
   try {
     const { token: providedToken, label } = await req.json()
     const token = (providedToken ?? "").trim()
 
-    console.log("관리자 토큰 저장 요청:", { token: token.substring(0, 20) + "...", label })
+    // 토큰 검증
+    if (!validateToken(token)) {
+      return NextResponse.json(
+        { error: "Invalid token format" },
+        { status: 400 }
+      )
+    }
 
-    if (!token) {
-      console.error("토큰이 비어있습니다.")
-      return NextResponse.json({ error: "토큰이 제공되지 않았습니다." }, { status: 400 })
+    // Label 검증
+    if (label !== null && label !== undefined && typeof label !== "string") {
+      return NextResponse.json(
+        { error: "Invalid label" },
+        { status: 400 }
+      )
+    }
+
+    if (label && label.length > 100) {
+      return NextResponse.json(
+        { error: "Label too long" },
+        { status: 400 }
+      )
     }
 
     const client = getSupabaseClient()
 
     const { data: existing, error: fetchError } = await client
       .from("admin_tokens")
-      .select("*")
+      .select("id, token, label")
       .eq("token", token)
-      .single()
+      .maybeSingle()
 
     if (fetchError && fetchError.code !== "PGRST116") {
-      // PGRST116 is "no rows found" which is expected
-      console.error("기존 토큰 조회 오류:", fetchError)
-      throw fetchError
+      console.error("Database error:", fetchError)
+      return NextResponse.json(
+        { error: "Database error" },
+        { status: 500 }
+      )
     }
 
     const payload = {
@@ -33,42 +77,42 @@ export async function POST(req) {
     }
 
     if (existing) {
-      console.log("기존 토큰 업데이트:", existing.id)
       const { data: updated, error: updateError } = await client
         .from("admin_tokens")
         .update(payload)
         .eq("id", existing.id)
-        .select()
+        .select("id, created_at")
         .single()
 
       if (updateError) {
-        console.error("토큰 업데이트 오류:", updateError)
-        throw updateError
+        console.error("Update error:", updateError)
+        return NextResponse.json(
+          { error: "Failed to update token" },
+          { status: 500 }
+        )
       }
-      console.log("토큰 업데이트 성공")
-      return NextResponse.json({ success: true, record: updated, created: false })
+      return NextResponse.json({ success: true, created: false })
     }
 
-    console.log("새 토큰 생성")
     const { data: record, error: createError } = await client
       .from("admin_tokens")
-      .insert([
-        {
-          token,
-          label: payload.label,
-        },
-      ])
-      .select()
+      .insert([{ token, label: payload.label }])
+      .select("id, created_at")
       .single()
 
     if (createError) {
-      console.error("토큰 생성 오류:", createError)
-      throw createError
+      console.error("Insert error:", createError)
+      return NextResponse.json(
+        { error: "Failed to create token" },
+        { status: 500 }
+      )
     }
-    console.log("토큰 생성 성공:", record.id)
-    return NextResponse.json({ success: true, record, created: true })
+    return NextResponse.json({ success: true, created: true })
   } catch (error) {
-    console.error("토큰 저장 오류:", error)
-    return NextResponse.json({ success: false, detail: error.message }, { status: 500 })
+    console.error("Request error:", error)
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
+    )
   }
-}
+}}

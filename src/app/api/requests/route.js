@@ -5,6 +5,18 @@ import { broadcastAdminRequestNotification } from "@/lib/server/adminNotificatio
 import { getSupabaseClient } from "@/lib/server/supabaseClient"
 
 export async function GET(req) {
+  // 인증 확인
+  const authHeader = req.headers.get("authorization") || ""
+  const token = authHeader.replace(/^Bearer\s+/i, "")
+  const adminPassword = process.env.ADMIN_PASSWORD || process.env.PASSWORD
+
+  if (!adminPassword || token !== adminPassword) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    )
+  }
+
   const client = getSupabaseClient()
   const searchParams = new URL(req.url).searchParams
 
@@ -24,7 +36,11 @@ export async function GET(req) {
   const { data, error } = await query.order("created_at", { ascending: false })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("Query error:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch requests" },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ requests: data })
@@ -33,11 +49,39 @@ export async function GET(req) {
 export async function POST(req) {
   // IP 주소 가져오기 (프록시 환경일 경우 X-Forwarded-For 사용)
   const ipHeader = req.headers.get("X-Forwarded-For") || ""
-  const ip = ipHeader.split(",")[0].trim()
+  const ip = ipHeader.split(",")[0].trim() || "unknown"
 
   try {
     const body = await req.json()
-    console.log("POST /api/requests body:", body)
+
+    // 입력값 검증
+    if (!body.applicant || !Array.isArray(body.applicant) || body.applicant.length === 0) {
+      return NextResponse.json(
+        { error: "Invalid applicant data" },
+        { status: 400 }
+      )
+    }
+
+    if (typeof body.contact !== "string" || body.contact.length < 5 || body.contact.length > 50) {
+      return NextResponse.json(
+        { error: "Invalid contact" },
+        { status: 400 }
+      )
+    }
+
+    if (typeof body.reason !== "string" || body.reason.length < 1 || body.reason.length > 500) {
+      return NextResponse.json(
+        { error: "Invalid reason" },
+        { status: 400 }
+      )
+    }
+
+    if (typeof body.time !== "string" || !body.time.match(/^\d+$/)) {
+      return NextResponse.json(
+        { error: "Invalid time" },
+        { status: 400 }
+      )
+    }
 
     const client = getSupabaseClient()
 
@@ -49,86 +93,210 @@ export async function POST(req) {
         reason: body.reason,
         time: body.time,
         ip,
-        fcm: body.fcm,
-        is_approved: body.isApproved ?? false,
+        fcm: body.fcm || null,
+        is_approved: false,
         status: REQUEST_STATUS.PENDING,
       },
     ]).select().single()
 
     if (error) {
-      console.error("Supabase insert error:", error)
-      throw error
+      console.error("Database error:", error)
+      return NextResponse.json(
+        { error: "Failed to save request" },
+        { status: 500 }
+      )
     }
-
-    console.log("Record created successfully:", record)
 
     // 알림 전송은 비동기로 처리하여 응답 속도를 높인다.
     void broadcastAdminRequestNotification(record).catch((notificationError) => {
-      console.error("알림 처리 중 오류 발생:", notificationError)
+      console.error("Notification error:", notificationError)
     })
 
     return NextResponse.json({ success: true, record, notificationsQueued: true })
   } catch (error) {
-    console.error("신청 저장 및 알림 전송 오류:", error)
+    console.error("Request error:", error)
     return NextResponse.json(
-      {
-        error: error?.message || "데이터베이스 오류가 발생했습니다.",
-        details: error?.details || error?.toString(),
-      },
-      { status: 500 },
+      { error: "Invalid request" },
+      { status: 400 }
     )
   }
 }
 
 export async function PUT(req) {
-  const body = await req.json()
-  const searchParams = new URL(req.url).searchParams
-  const id = searchParams.get("id")
+  // 간단한 인증 확인
+  const authHeader = req.headers.get("authorization") || ""
+  const token = authHeader.replace(/^Bearer\s+/i, "")
+  const adminPassword = process.env.ADMIN_PASSWORD || process.env.PASSWORD
 
-  const client = getSupabaseClient()
-  const { data, error } = await client
-    .from("requests")
-    .upsert({ ...body, id }, { onConflict: "id" })
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!adminPassword || token !== adminPassword) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    )
   }
 
-  return NextResponse.json(data)
+  try {
+    const body = await req.json()
+    const searchParams = new URL(req.url).searchParams
+    const id = searchParams.get("id")
+
+    if (!id || typeof id !== "string") {
+      return NextResponse.json(
+        { error: "Invalid ID" },
+        { status: 400 }
+      )
+    }
+
+    // 업데이트할 필드 제한
+    const allowedFields = ["status", "is_approved", "reason"]
+    const updateData = {}
+    for (const field of allowedFields) {
+      if (field in body) {
+        updateData[field] = body[field]
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: "No valid fields to update" },
+        { status: 400 }
+      )
+    }
+
+    const client = getSupabaseClient()
+    const { data, error } = await client
+      .from("requests")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Update error:", error)
+      return NextResponse.json(
+        { error: "Failed to update request" },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error("Request error:", error)
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
+    )
+  }
 }
 
 export async function PATCH(req) {
-  const body = await req.json()
-  const searchParams = new URL(req.url).searchParams
-  const id = searchParams.get("id")
+  // 인증 확인
+  const authHeader = req.headers.get("authorization") || ""
+  const token = authHeader.replace(/^Bearer\s+/i, "")
+  const adminPassword = process.env.ADMIN_PASSWORD || process.env.PASSWORD
 
-  const client = getSupabaseClient()
-  const { data, error } = await client
-    .from("requests")
-    .update(body)
-    .eq("id", id)
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!adminPassword || token !== adminPassword) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    )
   }
 
-  return NextResponse.json(data)
+  try {
+    const body = await req.json()
+    const searchParams = new URL(req.url).searchParams
+    const id = searchParams.get("id")
+
+    if (!id || typeof id !== "string") {
+      return NextResponse.json(
+        { error: "Invalid ID" },
+        { status: 400 }
+      )
+    }
+
+    // 업데이트할 필드 제한
+    const allowedFields = ["status", "is_approved", "reason"]
+    const updateData = {}
+    for (const field of allowedFields) {
+      if (field in body) {
+        updateData[field] = body[field]
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: "No valid fields to update" },
+        { status: 400 }
+      )
+    }
+
+    const client = getSupabaseClient()
+    const { data, error } = await client
+      .from("requests")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Update error:", error)
+      return NextResponse.json(
+        { error: "Failed to update request" },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error("Request error:", error)
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
+    )
+  }
 }
 
 export async function DELETE(req) {
-  const searchParams = new URL(req.url).searchParams
-  const id = searchParams.get("id")
+  // 인증 확인
+  const authHeader = req.headers.get("authorization") || ""
+  const token = authHeader.replace(/^Bearer\s+/i, "")
+  const adminPassword = process.env.ADMIN_PASSWORD || process.env.PASSWORD
 
-  const client = getSupabaseClient()
-  const { data, error } = await client.from("requests").delete().eq("id", id).select().single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!adminPassword || token !== adminPassword) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    )
   }
 
-  return NextResponse.json(data)
+  try {
+    const searchParams = new URL(req.url).searchParams
+    const id = searchParams.get("id")
+
+    if (!id || typeof id !== "string") {
+      return NextResponse.json(
+        { error: "Invalid ID" },
+        { status: 400 }
+      )
+    }
+
+    const client = getSupabaseClient()
+    const { data, error } = await client.from("requests").delete().eq("id", id).select().single()
+
+    if (error) {
+      console.error("Delete error:", error)
+      return NextResponse.json(
+        { error: "Failed to delete request" },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error("Request error:", error)
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
+    )
+  }
 }
