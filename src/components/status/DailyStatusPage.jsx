@@ -29,8 +29,7 @@ async function fetchDailyRequests(status) {
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
   const todayEnd = new Date(new Date().setHours(23, 59, 59, 999)).toISOString()
 
-  // Supabase는 직접 URL 쿼리 파라미터로 필터링
-  // created_at이 todayStart와 todayEnd 사이의 요청만 필터링
+  // 공개 페이지는 인증 없이 요청
   const response = await fetch(
     `/api/requests?status=${status}`,
   )

@@ -5,20 +5,24 @@ import { broadcastAdminRequestNotification } from "@/lib/server/adminNotificatio
 import { getSupabaseClient } from "@/lib/server/supabaseClient"
 
 export async function GET(req) {
-  // 인증 확인
+  const client = getSupabaseClient()
+  const searchParams = new URL(req.url).searchParams
+
+  // 인증 확인 (관리자용 또는 민감한 필터링이 필요한 경우)
   const authHeader = req.headers.get("authorization") || ""
   const token = authHeader.replace(/^Bearer\s+/i, "")
   const adminPassword = process.env.ADMIN_PASSWORD || process.env.PASSWORD
 
-  if (!adminPassword || token !== adminPassword) {
+  // isApproved 파라미터가 있는 경우 (다운로드 페이지) 또는 관리자용 요청이면 인증 필수
+  const isDownloadRequest = searchParams.has("isApproved")
+  const requiresAuth = isDownloadRequest
+
+  if (requiresAuth && (!adminPassword || token !== adminPassword)) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 401 }
     )
   }
-
-  const client = getSupabaseClient()
-  const searchParams = new URL(req.url).searchParams
 
   let query = client.from("requests").select("*")
 

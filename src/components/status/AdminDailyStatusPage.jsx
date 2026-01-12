@@ -5,11 +5,15 @@ import { useEffect, useMemo, useState } from "react"
 import { mapRequestsByPeriod, transformRequest } from "@/lib/admin/requests"
 import { STUDY_PERIOD_OPTIONS } from "@/lib/constants"
 
-async function fetchAdminRequests(status) {
+async function fetchAdminRequests(status, token) {
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
   const todayEnd = new Date(new Date().setHours(23, 59, 59, 999)).toISOString()
 
-  const response = await fetch(`/api/requests?status=${status}`)
+  const response = await fetch(`/api/requests?status=${status}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
   if (!response.ok) {
     throw new Error("데이터를 불러오는데 실패했습니다.")
   }
@@ -38,17 +42,23 @@ export default function AdminDailyStatusPage({
 }) {
   const [mounted, setMounted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [token, setToken] = useState("")
   const [requestsByPeriod, setRequestsByPeriod] = useState({})
 
   useEffect(() => {
     setMounted(true)
+    const savedToken = localStorage.getItem("admin_token")
+    if (savedToken) {
+      setToken(savedToken)
+    }
   }, [])
 
   useEffect(() => {
     const loadRequests = async () => {
+      if (!token) return
       setIsLoading(true)
       try {
-        const data = await fetchAdminRequests(status)
+        const data = await fetchAdminRequests(status, token)
         setRequestsByPeriod(mapRequestsByPeriod(data))
       } catch (error) {
         console.error("관리자 데이터 가져오기 오류:", error)
@@ -59,7 +69,7 @@ export default function AdminDailyStatusPage({
     }
 
     loadRequests()
-  }, [status])
+  }, [status, token])
 
   const slides = useMemo(() => {
     return STUDY_PERIOD_OPTIONS.map((option) => ({

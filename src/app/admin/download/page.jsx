@@ -344,6 +344,7 @@ export default function Homeadmin() {
   const router = useRouter()
   const [data, setData] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [token, setToken] = useState("")
   // 데스크톱용 페이지 인덱스
   const [pageIndex, setPageIndex] = useState(0)
   // 모바일용 페이지 인덱스 (한 화면에 3개씩)
@@ -353,11 +354,24 @@ export default function Homeadmin() {
   const isMobile = useMediaQuery({ query: "(max-width: 768px)" })
   const toast = useToast()
 
+  // 컴포넌트 마운트 시 로컬 스토리지에서 토큰 복구
+  useEffect(() => {
+    const savedToken = localStorage.getItem("admin_token")
+    if (savedToken) {
+      setToken(savedToken)
+    }
+  }, [])
+
   // API에서 데이터 가져오기
   const fetchData = useCallback(async () => {
+    if (!token) return
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/requests?isApproved=true`)
+      const response = await fetch(`/api/requests?isApproved=true`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
       const result = await response.json()
       const transformedData = result.requests
         .map(transformRequest)
@@ -376,7 +390,7 @@ export default function Homeadmin() {
     } finally {
       setIsLoading(false)
     }
-  }, [toast.error])
+  }, [token, toast.error])
 
   useEffect(() => {
     fetchData()
