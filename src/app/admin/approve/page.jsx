@@ -407,8 +407,18 @@ export default function ApproveRequestsPage() {
 
   const toast = useToast()
   const [password, setPassword] = useState("")
+  const [token, setToken] = useState("")
   const [isPasswordCorrect, setIsPasswordCorrect] = useState(false)
   const [requests, setRequests] = useState([])
+
+  // 컴포넌트 마운트 시 로컬 스토리지에서 토큰 복구
+  useEffect(() => {
+    const savedToken = localStorage.getItem("admin_token")
+    if (savedToken) {
+      setToken(savedToken)
+      setIsPasswordCorrect(true)
+    }
+  }, [])
   const [optimisticRequests, applyOptimisticRequest] = useOptimistic(
     requests,
     (current, action) => {
@@ -449,7 +459,7 @@ export default function ApproveRequestsPage() {
 
       const response = await fetch(`/api/requests`, {
         headers: {
-          Authorization: `Bearer ${password}`,
+          Authorization: `Bearer ${token}`,
         },
       })
       const result = await response.json()
@@ -476,7 +486,7 @@ export default function ApproveRequestsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [applyOptimisticRequest, toast.error])
+  }, [applyOptimisticRequest, token, toast.error])
 
   useEffect(() => {
     if (isPasswordCorrect) {
@@ -492,6 +502,8 @@ export default function ApproveRequestsPage() {
     })
     const result = await res.json()
     if (result.success) {
+      setToken(password)
+      localStorage.setItem("admin_token", password)
       setIsPasswordCorrect(true)
     } else {
       toast.error("비밀번호가 틀렸습니다. 다시 시도해주세요.", { duration: 500 })
