@@ -377,7 +377,7 @@ function MobileCards({
         <button
           type="button"
           className="btn btn-outline flex-1"
-          onClick={() => router.push("/statusfalse")}
+          onClick={() => router.push("/admin/statusfalse")}
         >
           거절 현황
         </button>
@@ -447,9 +447,13 @@ export default function ApproveRequestsPage() {
       const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
       const todayEnd = new Date(new Date().setHours(23, 59, 59, 999)).toISOString()
 
-      const response = await fetch(`/api/requests`)
+      const response = await fetch(`/api/requests`, {
+        headers: {
+          Authorization: `Bearer ${password}`,
+        },
+      })
       const result = await response.json()
-      const filtered = result.requests
+      const filtered = (Array.isArray(result.requests) ? result.requests : [])
         .filter((request) => {
           const createdAt = new Date(request.created_at)
           const startDate = new Date(todayStart)
