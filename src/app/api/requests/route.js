@@ -34,6 +34,10 @@ export async function GET(req) {
       query = query.eq("status", value)
     } else if (key === "isApproved") {
       query = query.eq("is_approved", value === "true")
+    } else if (key === "created_at_gte") {
+      query = query.gte("created_at", value)
+    } else if (key === "created_at_lte") {
+      query = query.lte("created_at", value)
     }
   }
 

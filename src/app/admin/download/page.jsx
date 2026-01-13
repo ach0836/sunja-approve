@@ -367,7 +367,15 @@ export default function Homeadmin() {
     if (!token) return
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/requests?isApproved=true`, {
+      // 오늘 날짜의 시작(00:00:00)과 끝(23:59:59) 시간 계산
+      const today = new Date()
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0)
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999)
+
+      const startIso = startOfDay.toISOString()
+      const endIso = endOfDay.toISOString()
+
+      const response = await fetch(`/api/requests?isApproved=true&created_at_gte=${startIso}&created_at_lte=${endIso}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
