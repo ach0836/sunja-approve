@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react"
 import { STUDY_PERIOD_OPTIONS } from "@/lib/constants"
 
 const columns = [
+  { key: "applied_at", header: "신청시간" },
   { key: "name", header: "대표자" },
   { key: "count", header: "총인원" },
 ]
@@ -46,11 +47,24 @@ async function fetchDailyRequests(status) {
     return createdAt >= startDate && createdAt <= endDate
   })
 
-  return filtered.map((request) => ({
-    ...request,
-    name: request.applicant?.[0]?.name ?? "N/A",
-    count: `${request.applicant?.length ?? 0}명`,
-  }))
+  return filtered.map((request) => {
+    const date = new Date(request.created_at)
+    const applied_at = isNaN(date.getTime())
+      ? "N/A"
+      : date.toLocaleTimeString("ko-KR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })
+
+
+    return {
+      ...request,
+      applied_at,
+      name: request.applicant?.[0]?.name ?? "N/A",
+      count: `${request.applicant?.length ?? 0}명`,
+    }
+  })
 }
 
 export default function DailyStatusPage({ status, emptyMessage, loadingMessage = "로딩 중..." }) {
