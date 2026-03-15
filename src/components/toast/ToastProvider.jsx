@@ -151,7 +151,17 @@ export function ToastProvider({ children }) {
 export function useToast() {
   const context = useContext(ToastContext);
   if (!context) {
-    throw new Error("useToast must be used within a ToastProvider");
+    console.warn("useToast must be used within a ToastProvider");
+    // 기본적인 toast 구현 반환 (폴백)
+    return {
+      addToast: () => null,
+      updateToast: () => null,
+      dismissToast: () => null,
+      success: (msg) => console.log("Toast Success:", msg),
+      error: (msg) => console.error("Toast Error:", msg),
+      warning: (msg) => console.warn("Toast Warning:", msg),
+      info: (msg) => console.info("Toast Info:", msg),
+    };
   }
   return context;
 }

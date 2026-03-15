@@ -51,17 +51,25 @@ export function useFcmToken() {
 
     ensurePermissionAndToken()
 
-    unsubscribe = onMessage(messaging, (payload) => {
-      if (payload?.notification) {
-        const { title, body } = payload.notification
-        toast.info(`${title ?? ""}: ${body ?? ""}`, { duration: 5000 })
-      }
-    })
+    try {
+      unsubscribe = onMessage(messaging, (payload) => {
+        if (payload?.notification) {
+          const { title, body } = payload.notification
+          if (toast?.info) {
+            toast.info(`${title ?? ""}: ${body ?? ""}`, { duration: 5000 })
+          }
+        }
+      })
+    } catch (error) {
+      console.error("메시지 리스너 설정 오류:", error)
+    }
 
     return () => {
-      unsubscribe?.()
+      if (typeof unsubscribe === "function") {
+        unsubscribe()
+      }
     }
-  }, [toast.info])
+  }, [toast])
 
   return fcmToken
 }

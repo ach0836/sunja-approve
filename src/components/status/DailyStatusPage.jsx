@@ -26,31 +26,48 @@ function groupByStudyPeriod(requests) {
 }
 
 async function fetchDailyRequests(status) {
-  const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
-  const todayEnd = new Date(new Date().setHours(23, 59, 59, 999)).toISOString()
+  try {
+    const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+    const todayEnd = new Date(new Date().setHours(23, 59, 59, 999)).toISOString()
 
-  // 공개 페이지는 인증 없이 요청
-  const response = await fetch(
-    `/api/requests?status=${status}`,
-  )
+    // 공개 페이지는 인증 없이 요청
+    const response = await fetch(
+      `/api/requests?status=${status}`,
+    )
 
-  if (!response.ok) {
-    throw new Error("데이터를 불러오는데 실패했습니다.")
+    if (!response.ok) {
+      console.error("API response not ok:", response.status)
+      return []
+    }
+
+    const result = await response.json()
+
+    if (!result || !result.requests || !Array.isArray(result.requests)) {
+      console.warn("Invalid response format:", result)
+      return []
+    }
+
+    const filtered = result.requests.filter((request) => {
+      try {
+        const createdAt = new Date(request.created_at)
+        const startDate = new Date(todayStart)
+        const endDate = new Date(todayEnd)
+        return createdAt >= startDate && createdAt <= endDate
+      } catch (error) {
+        console.error("Error filtering request:", error, request)
+        return false
+      }
+    })
+
+    return filtered.map((request) => ({
+      ...request,
+      name: request.applicant?.[0]?.name ?? "N/A",
+      count: `${request.applicant?.length ?? 0}명`,
+    }))
+  } catch (error) {
+    console.error("Error in fetchDailyRequests:", error)
+    return []
   }
-
-  const result = await response.json()
-  const filtered = result.requests.filter((request) => {
-    const createdAt = new Date(request.created_at)
-    const startDate = new Date(todayStart)
-    const endDate = new Date(todayEnd)
-    return createdAt >= startDate && createdAt <= endDate
-  })
-
-  return filtered.map((request) => ({
-    ...request,
-    name: request.applicant?.[0]?.name ?? "N/A",
-    count: `${request.applicant?.length ?? 0}명`,
-  }))
 }
 
 export default function DailyStatusPage({ status, emptyMessage, loadingMessage = "로딩 중..." }) {

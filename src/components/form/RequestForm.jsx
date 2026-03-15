@@ -66,17 +66,27 @@ export default function RequestForm({
   } = form
 
   const showToast = (message, type) => {
-    const handler = type === "success" ? toast.success : type === "error" ? toast.error : toast.info
+    try {
+      const handler = type === "success" ? toast.success : type === "error" ? toast.error : toast.info
 
-    handler(message, {
-      duration: 3000,
-    })
+      if (typeof handler === "function") {
+        handler(message, {
+          duration: 3000,
+        })
+      } else {
+        console.warn(`Toast handler not available for type: ${type}`)
+      }
 
-    if (type === "success") {
-      // 제출 성공 시 1.5초 후 페이지 새로고침
-      setTimeout(() => {
-        window.location.href = "/"
-      }, 1500)
+      if (type === "success") {
+        // 제출 성공 시 1.5초 후 페이지 새로고침
+        setTimeout(() => {
+          window.location.href = "/"
+        }, 1500)
+      }
+    } catch (error) {
+      console.error("Error showing toast:", error)
+      // 폴백: 기본 alert 사용
+      alert(message)
     }
   }
 

@@ -15,12 +15,25 @@ const firebaseConfig = {
   measurementId: "G-3YJ3BXSTXD",
 }
 
-const app = initializeApp(firebaseConfig)
-
-// 클라이언트 환경에서만 Messaging 초기화 진행
+let app = null
 let messaging = null
-if (typeof window !== "undefined") {
-  messaging = getMessaging(app)
+
+try {
+  app = initializeApp(firebaseConfig)
+
+  // 클라이언트 환경에서만 Messaging 초기화 진행
+  if (typeof window !== "undefined") {
+    try {
+      messaging = getMessaging(app)
+    } catch (messagingError) {
+      console.warn("Firebase Messaging initialization failed:", messagingError.message)
+      messaging = null
+    }
+  }
+} catch (error) {
+  console.error("Firebase initialization failed:", error.message)
+  app = null
+  messaging = null
 }
 
 export { messaging, getToken, firebaseOnMessage as onMessage }
