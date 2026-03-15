@@ -4,15 +4,15 @@
 import { initializeApp } from "firebase/app"
 import { getMessaging, getToken, onMessage as firebaseOnMessage } from "firebase/messaging"
 
-// Firebase 콘솔에서 제공하는 설정값으로 변경하세요.
+// Firebase 설정값은 환경변수에서 로드합니다.
 const firebaseConfig = {
-  apiKey: "AIzaSyC247JpsaLZNtSIAHS8zrpKqVVs4pi-ExE",
-  authDomain: "sunja-d2423.firebaseapp.com",
-  projectId: "sunja-d2423",
-  storageBucket: "sunja-d2423.firebasestorage.app",
-  messagingSenderId: "401866580480",
-  appId: "1:401866580480:web:3bc7935a160d5780aaaee5",
-  measurementId: "G-3YJ3BXSTXD",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
 let app = null
