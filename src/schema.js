@@ -2,7 +2,7 @@ import { z } from "zod"
 
 const applicantSchema = z.object({
   name: z.string().min(2, "이름을 입력하세요"),
-  number: z.string().regex(/^[1-3][1-4](0[1-9]|[1-2][0-9]|30)$/, "학번을 입력하세요"),
+  number: z.string().regex(/^[1-3][1-5](0[1-9]|[1-2][0-9]|30)$/, "학번을 입력하세요"),
 })
 
 const formSchema = z.object({
