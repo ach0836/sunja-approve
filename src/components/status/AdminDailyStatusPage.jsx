@@ -47,10 +47,7 @@ export default function AdminDailyStatusPage({
 
   useEffect(() => {
     setMounted(true)
-    const savedToken = localStorage.getItem("admin_token")
-    if (savedToken) {
-      setToken(savedToken)
-    }
+    // localStorage 사용 제거 - 매번 비밀번호 입력 필요
   }, [])
 
   useEffect(() => {
