@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useId, useState } from "react"
 import {
   useReactTable,
   getCoreRowModel,
@@ -114,6 +114,46 @@ const downloadTemplatePDF = async (rowData) => {
 
   const pdfBytes = await pdfDoc.save()
   download(pdfBytes, `${rowData.name}_template.pdf`, "application/pdf")
+}
+
+// ─── 비밀번호 입력 폼 컴포넌트 ─────────────────────────────
+function PasswordForm({ password, setPassword, onSubmit, router }) {
+  const passwordInputId = useId()
+  return (
+    <div className="card w-full max-w-md bg-base-100 shadow-lg">
+      <div className="card-body space-y-5">
+        <div className="space-y-1 text-center">
+          <h2 className="text-xl font-semibold text-base-content">관리자 로그인</h2>
+          <p className="text-sm text-base-content/60">
+            다운로드 페이지 접근을 위해 비밀번호를 입력하세요.
+          </p>
+        </div>
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="form-control w-full">
+            <label htmlFor={passwordInputId} className="label">
+              <span className="label-text font-semibold">비밀번호</span>
+            </label>
+            <input
+              id={passwordInputId}
+              type="password"
+              placeholder="비밀번호를 입력하세요"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="input input-bordered w-full"
+            />
+          </div>
+          <div className="grid gap-3">
+            <button type="submit" className="btn btn-soft btn-primary btn-lg">
+              로그인
+            </button>
+            <button type="button" className="btn btn-outline" onClick={() => router.push("/admin")}>
+              뒤로가기
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 // ─── 데스크톱용 테이블 열 정의 ─────────────────────────────
@@ -344,7 +384,9 @@ export default function Homeadmin() {
   const router = useRouter()
   const [data, setData] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [password, setPassword] = useState("")
   const [token, setToken] = useState("")
+  const [isPasswordCorrect, setIsPasswordCorrect] = useState(false)
   // 데스크톱용 페이지 인덱스
   const [pageIndex, setPageIndex] = useState(0)
   // 모바일용 페이지 인덱스 (한 화면에 3개씩)
@@ -353,14 +395,6 @@ export default function Homeadmin() {
   const mobilePageSize = 3
   const isMobile = useMediaQuery({ query: "(max-width: 768px)" })
   const toast = useToast()
-
-  // 컴포넌트 마운트 시 로컬 스토리지에서 토큰 복구
-  useEffect(() => {
-    const savedToken = localStorage.getItem("admin_token")
-    if (savedToken) {
-      setToken(savedToken)
-    }
-  }, [])
 
   // API에서 데이터 가져오기
   const fetchData = useCallback(async () => {
@@ -381,7 +415,12 @@ export default function Homeadmin() {
         },
       })
       const result = await response.json()
-      const transformedData = result.requests
+      if (!response.ok) {
+        toast.error(result.error || "데이터 가져오기 중 오류 발생")
+        setData([])
+        return
+      }
+      const transformedData = (Array.isArray(result.requests) ? result.requests : [])
         .map(transformRequest)
         .map((request) => ({
           ...request,
@@ -401,8 +440,30 @@ export default function Homeadmin() {
   }, [token, toast.error])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    if (isPasswordCorrect) {
+      fetchData()
+    }
+  }, [isPasswordCorrect, fetchData])
+
+  const handlePasswordSubmit = async (event) => {
+    event.preventDefault()
+    try {
+      const res = await fetch("/api/admin/auth", {
+        method: "POST",
+        body: password,
+      })
+      const result = await res.json()
+      if (result.success) {
+        setToken(password)
+        setIsPasswordCorrect(true)
+      } else {
+        toast.error("비밀번호가 틀렸습니다. 다시 시도해주세요.")
+      }
+    } catch (error) {
+      console.error("로그인 오류:", error)
+      toast.error("로그인 중 오류가 발생했습니다.")
+    }
+  }
 
   const handleNextPage = () => {
     setPageIndex((prev) => Math.min(prev + 1, table.getPageCount() - 1))
@@ -448,7 +509,16 @@ export default function Homeadmin() {
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center bg-base-200 p-6">
-      {isMobile ? (
+      {!isPasswordCorrect ? (
+        <div className="flex w-full items-center justify-center">
+          <PasswordForm
+            password={password}
+            setPassword={setPassword}
+            onSubmit={handlePasswordSubmit}
+            router={router}
+          />
+        </div>
+      ) : isMobile ? (
         <MobileDataView
           data={data}
           downloadTemplatePDF={downloadTemplatePDF}
