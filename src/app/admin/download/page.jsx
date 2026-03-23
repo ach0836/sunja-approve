@@ -450,7 +450,10 @@ export default function Homeadmin() {
     try {
       const res = await fetch("/api/admin/auth", {
         method: "POST",
-        body: password,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
       })
       const result = await res.json()
       if (result.success) {
