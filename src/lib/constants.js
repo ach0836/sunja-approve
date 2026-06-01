@@ -4,10 +4,10 @@ export const STUDY_PERIOD_OPTIONS = [
   { value: "3", label: "야자 3교시" },
 ]
 
-export const DEFAULT_KAKAO_URL = "https://open.kakao.com/o/sJhz4Kgh"
-export const SUPPORT_CONTACT = "010-8370-9943"
+export const DEFAULT_KAKAO_URL = "https://open.kakao.com/o/s8f8QJwi"
+export const SUPPORT_CONTACT = "010-8629-9259"
 
-export const PREMIUM_MEMBER_NAMES = ["안채헌", "김민규"]
+export const PREMIUM_MEMBER_NAMES = ["안채헌", "박주영"]
 
 export const DEFAULT_APPLICANT_OPTIONS = [2, 3, 4, 5]
 export const EXTENDED_APPLICANT_OPTIONS = Array.from({ length: 20 }, (_, i) => i + 1)
